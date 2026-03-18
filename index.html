@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Resume Screener</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', sans-serif; background:#f0f4f8; color:#1a1a2e; min-height:100vh; }
+  header { background:linear-gradient(135deg,#1a1a2e,#16213e); padding:28px 40px; }
+  header h1 { color:#fff; font-size:26px; font-weight:600; }
+  header p { color:#8892b0; font-size:14px; margin-top:4px; }
+  .container { max-width:900px; margin:32px auto; padding:0 20px; }
+  .card { background:#fff; border-radius:14px; padding:28px; margin-bottom:24px; box-shadow:0 2px 12px rgba(0,0,0,0.07); }
+  .card h2 { font-size:16px; font-weight:600; margin-bottom:16px; color:#1a1a2e; }
+  label { font-size:13px; font-weight:500; color:#555; display:block; margin-bottom:6px; }
+  input[type=text] { width:100%; padding:10px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; margin-bottom:16px; }
+  textarea { width:100%; padding:12px 14px; border:1px solid #ddd; border-radius:8px; font-size:14px; resize:vertical; min-height:140px; font-family:inherit; }
+  .upload-area { border:2px dashed #c0c9d8; border-radius:10px; padding:28px; text-align:center; cursor:pointer; transition:border-color .2s; margin-top:12px; }
+  .upload-area:hover { border-color:#4361ee; }
+  .upload-area p { color:#888; font-size:14px; margin-top:8px; }
+  .upload-area span { font-size:32px; }
+  #file-list { margin-top:12px; font-size:13px; color:#4361ee; }
+  .btn { width:100%; padding:14px; background:linear-gradient(135deg,#4361ee,#3a0ca3); color:#fff; border:none; border-radius:10px; font-size:16px; font-weight:600; cursor:pointer; transition:opacity .2s; }
+  .btn:hover { opacity:0.9; }
+  .btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .result-card { background:#fff; border-radius:14px; padding:24px; margin-bottom:20px; box-shadow:0 2px 12px rgba(0,0,0,0.07); border-left:5px solid #4361ee; }
+  .result-card.hire { border-left-color:#2ecc71; }
+  .result-card.nohire { border-left-color:#e74c3c; }
+  .result-card.maybe { border-left-color:#f39c12; }
+  .result-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .result-name { font-size:18px; font-weight:600; }
+  .score-badge { font-size:24px; font-weight:700; padding:8px 18px; border-radius:30px; }
+  .hire .score-badge { background:#d5f5e3; color:#1a8a4a; }
+  .nohire .score-badge { background:#fde8e8; color:#c0392b; }
+  .maybe .score-badge { background:#fef3cd; color:#b7770d; }
+  .verdict { display:inline-block; padding:4px 14px; border-radius:20px; font-size:12px; font-weight:600; margin-bottom:14px; }
+  .hire .verdict { background:#d5f5e3; color:#1a8a4a; }
+  .nohire .verdict { background:#fde8e8; color:#c0392b; }
+  .maybe .verdict { background:#fef3cd; color:#b7770d; }
+  .section-title { font-size:12px; font-weight:600; color:#888; text-transform:uppercase; letter-spacing:.5px; margin:14px 0 6px; }
+  .skills-row { display:flex; flex-wrap:wrap; gap:8px; }
+  .skill-tag { padding:4px 12px; border-radius:20px; font-size:12px; }
+  .skill-match { background:#d5f5e3; color:#1a8a4a; }
+  .skill-miss { background:#fde8e8; color:#c0392b; }
+  .summary-text { font-size:14px; color:#444; line-height:1.6; }
+  .summary-table { width:100%; border-collapse:collapse; margin-top:8px; }
+  .summary-table th { background:#f0f4f8; padding:10px 14px; text-align:left; font-size:13px; color:#555; }
+  .summary-table td { padding:10px 14px; font-size:13px; border-bottom:1px solid #f0f0f0; }
+  .loading { text-align:center; padding:40px; color:#888; }
+  .spinner { display:inline-block; width:36px; height:36px; border:3px solid #e0e0e0; border-top-color:#4361ee; border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:12px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #results { display:none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🤖 AI Resume Screener</h1>
+  <p>Powered by Claude API — Match resumes to job descriptions instantly</p>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>⚙️ Configuration</h2>
+    <label>Your Anthropic API Key</label>
+    <input type="text" id="api-key" placeholder="sk-ant-api03-..." />
+  </div>
+
+  <div class="card">
+    <h2>📋 Job Description</h2>
+    <label>Paste the full job description below</label>
+    <textarea id="jd" placeholder="Paste job description here...&#10;&#10;Example: We are looking for a Business Analyst with 0-2 years experience, proficient in SQL, Excel, Power BI..."></textarea>
+  </div>
+
+  <div class="card">
+    <h2>📄 Upload Resumes</h2>
+    <div class="upload-area" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+
+
+      <span>📁</span>
+      <p>Click to upload PDF resumes</p>
+      <p style="font-size:12px;color:#aaa;margin-top:4px">You can select multiple files</p>    <input type="file" id="resume-files" accept=".pdf" multiple style="display:block;width:100%;margin-top:12px;" onchange="showFiles(this)">
+    <div id="file-list"></div>
+  </div>
+
+  <button class="btn" onclick="screenResumes()">🔍 Screen Resumes with AI</button>
+
+  <div id="results" style="margin-top:32px;">
+    <h2 style="font-size:20px;font-weight:700;margin-bottom:20px;">📊 Screening Results</h2>
+    <div id="result-cards"></div>
+    <div class="card" id="summary-section" style="margin-top:8px;">
+      <h2>📈 Summary Table</h2>
+      <table class="summary-table">
+        <thead><tr><th>Resume</th><th>Match %</th><th>Verdict</th><th>Top Missing Skill</th></tr></thead>
+        <tbody id="summary-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="screener.js"></script>
+</body>
+</html>
